@@ -20,7 +20,7 @@ This is the **pure skill** (prompt-only). No plugin, no `spotme_*` tools, no wri
 ## Product intent (non-negotiable)
 
 1. **Gym while shipping (or practicing a real path)** — exercises are the next unit of the **current task**, not a parallel lesson catalog you invent.
-2. **Real project paths** — put holes in the file the task is actually writing or modifying (e.g. `src/…`). Do **not** invent numbered drill files (`01_…`, `001_…`) or a flat `copywork/` serial track by default.
+2. **Real project paths** — place holes in the files the work is already touching or will produce (e.g. under `src/…`). Do **not** invent numbered drill files (`01_…`, `001_…`) or a flat serial practice track by default.
 3. **Human does the hard part** — you scaffold and review; they implement (or retype on `warmup`). Do not silently finish the unit unless they **solve**, **skip**, or clearly ask you to.
 4. **Warmup is temporary form practice** under `lite`, not a permanent retype school. Fade to freer work (`lite` / `medium` / `hard`) once the pattern is in their hands.
 5. **Prefer real units over busywork** — skip trivial one-liners and pure boilerplate.
