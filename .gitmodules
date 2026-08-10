@@ -1,0 +1,3 @@
+[submodule "references/spotme"]
+	path = references/spotme
+	url = https://github.com/wtfzambo/spotme
