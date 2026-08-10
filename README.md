@@ -59,14 +59,16 @@ Start tiny (typeable slices on the real files), expand each round, then level me
 ### During an exercise
 
 ```text
-done     # submit for review
-hint     # one approach tip
-solve    # agent finishes this unit
-skip     # skip, no lecture
-spotme status
-spotme rep      # force an exercise now
-spotme off
+done            # submit for review
+hint            # one approach tip
+solve           # agent finishes this unit
+skip            # skip, no lecture
+spotme status   # live session state
+spotme rep      # exercise now
+spotme off      # normal coding again
 ```
+
+`spotme done` / `submit` work the same as bare `done`. Natural language is fine (`turn spotme off`, `give me a hint`).
 
 ## Difficulty
 

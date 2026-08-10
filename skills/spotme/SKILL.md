@@ -98,25 +98,27 @@ Do not store SpotMe state outside `.spotme/`. Do not invent package tools.
 
 ## Commands / intents
 
-Hosts may use slash names (`/spotme:on`, …) or natural language. Treat as equivalent.
+Users speak intents in natural language or `spotme …` phrases. If a host exposes `/spotme:…` slashes, treat them as the same intents.
 
-| Intent | Action |
-|--------|--------|
-| **on** `[warmup\|lite\|medium\|hard]` `[every N\|--every N]` | Enable recurring mode |
-| **off** | Disable; clear counter, exercise, warmup; normal coding |
-| **status** | Report live state from `session.json` |
-| **rep** / exercise now | On-demand exercise (no counter bump first) |
-| **done** / submit | Review → continue task → end exercise last |
-| **hint** | One short approach paragraph; keep exercise |
-| **solve** | Implement → continue task → end exercise last |
-| **skip** | Finish unit (no review lecture) → continue → end last |
+| Intent | How users often say it | Action |
+|--------|------------------------|--------|
+| **on** | `spotme on` · `spotme on hard --every 3` · `SpotMe on medium` | Enable recurring mode |
+| **off** | `spotme off` · `turn spotme off` | Disable; clear counter, exercise, warmup; normal coding |
+| **status** | `spotme status` · `spotme status please` | Report live state from `session.json` |
+| **rep** | `spotme rep` · `exercise now` · `give me a rep` | On-demand exercise (no counter bump first) |
+| **done** | `done` · `spotme done` · `submit` | Review → continue task → end exercise last |
+| **hint** | `hint` · `spotme hint` | One short approach paragraph; keep exercise |
+| **solve** | `solve` · `spotme solve` | Implement → continue task → end exercise last |
+| **skip** | `skip` · `spotme skip` | Finish unit (no review lecture) → continue → end last |
+
+Parse **on** args: `warmup` / `lite` / `medium` / `hard`; `every N` or `--every N`. Alias `copy` → `warmup`. Defaults: **medium**, every **2**.
 
 If done/hint/solve/skip with no active exercise: say so. Do not invent details.
 
 ### on
 
 1. Load `session.json` (or defaults).
-2. Parse args: `warmup` / `lite` / `medium` / `hard`; `every N` or `--every N`. Ignore unknown tokens (`copy` → `warmup`). Keep current values when omitted. Defaults: **medium**, every **2**. Reject non-positive `every`.
+2. Parse difficulty and `every` as above. Ignore unknown tokens. Keep current values when omitted. Reject non-positive `every`.
 3. Set `enabled=true`, `counter=0`, `exercise=null`, `exercisePending=false`. Do not rewrite an old exercise source file.
 4. Warmup state: if difficulty is `warmup` and `warmup` is null → `{ round: 1, thread: "", lastScope: "" }`. If difficulty left `warmup` → `warmup = null`. If staying on `warmup` → keep existing progression.
 5. Write `session.json`.
@@ -279,10 +281,10 @@ File: `{filePath}`
 Edit the file in your editor. Replace the `SPOTME:` marker with your implementation.
 
 Your options:
-  /spotme:hint   (or hint)   — get a targeted hint
-  /spotme:solve  (or solve)  — concede and let the agent finish
-  /spotme:skip   (or skip)   — skip this exercise
-  /spotme:done   (or done)   — submit your implementation for review
+  hint    — get a targeted hint
+  solve   — concede and let the agent finish
+  skip    — skip this exercise
+  done    — submit your implementation for review
 ```
 
 For **warmup**, replace the “Replace the SPOTME marker” line with:
@@ -292,7 +294,7 @@ Retype the `SPOTME-WARMUP` reference into the hole (do not paste). Delete the re
 Round: {warmup.round} — {warmup.thread or unit}
 ```
 
-Difficulty labels (plugin wording for `lite` / `medium` / `hard`):
+Difficulty labels (`lite` / `medium` / `hard` match the plugin ladder wording):
 
 - `warmup` — retype the reference into the hole — then delete the reference  
 - `lite` — signature + structure provided — implement the body  
@@ -369,12 +371,12 @@ Write `session.json`. Optional: `✅ Exercise closed. Counter reset.` For warmup
 
 ## Intents (no tools)
 
-| Intent | Action |
-|--------|--------|
+| Intent | Skill action |
+|--------|----------------|
 | **on** | Enable + settings in `session.json` |
 | **off** | Disable; clear exercise/counter/warmup |
 | **status** | Print `session.json` summary |
 | Unit counter | Logical units → pause for exercise |
 | Start exercise | Set `exercise`, clear pending, ready message |
 | End exercise | Clear exercise/counter/pending; keep `warmup` when applicable |
-| **done** / **hint** / **solve** / **skip** / **rep** | As above (slash or NL) |
+| **done** / **hint** / **solve** / **skip** / **rep** | Natural language or `spotme …` phrases |
