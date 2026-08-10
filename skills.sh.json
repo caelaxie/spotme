@@ -1,0 +1,11 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "SpotMe",
+      "description": "Human-in-the-loop gym mode for agentic coding — pure skill, no plugin required.",
+      "skills": ["spotme"]
+    }
+  ]
+}

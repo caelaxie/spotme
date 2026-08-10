@@ -1,9 +1,11 @@
 ---
 name: spotme
-description: Adds a human-in-the-loop coding practice mode. Use when a user wants the agent to scaffold selected implementation units, let the user write the code, and review or resume the task.
-compatibility: Works with Agent Skills hosts that provide file reading and editing capabilities. No host-specific commands, tools, or extensions are required.
+description: Gym mode for agentic coding. When active, scaffolds selected implementation units for the human to write, then reviews and resumes. Use when the user asks for SpotMe, gym mode, coding practice, or hands-on exercises while building software.
+license: MIT
+compatibility: Works with Agent Skills hosts that provide file reading and editing. No host-specific commands, tools, or extensions required.
 metadata:
-  version: "0.2.0"
+  author: caelaxie
+  version: "0.0.1"
   mode: manual
 ---
 
@@ -11,9 +13,7 @@ metadata:
 
 SpotMe is gym mode for agentic coding: the agent scaffolds a unit, the human implements it, the agent reviews and resumes.
 
-This is the **pure skill** (prompt-only). No plugin, no `spotme_*` tools, no write interception. You own the full state machine. Match the plugin’s user-facing behavior; store session data under the repo’s `.spotme/` directory.
-
-Upstream reference (behavior, wording, flow): `references/spotme/` — especially `SKILL.md`, `docs/flow.md`, `src/engine.ts`, `src/prompts.ts`.
+This is the **pure skill** (prompt-only). No plugin, no `spotme_*` tools, no write interception. You own the full state machine. Match the plugin’s user-facing behavior; store session data under the **target repository’s** `.spotme/` directory (not inside this skill package).
 
 **Default off.** While inactive and no one-shot exercise is open, write code normally.
 
