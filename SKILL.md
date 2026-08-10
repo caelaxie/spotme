@@ -3,163 +3,292 @@ name: spotme
 description: Adds a human-in-the-loop coding practice mode. Use when a user wants the agent to scaffold selected implementation units, let the user write the code, and review or resume the task.
 compatibility: Works with Agent Skills hosts that provide file reading and editing capabilities. No host-specific commands, tools, or extensions are required.
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   mode: manual
 ---
 
 # SpotMe
 
-SpotMe changes the coding workflow from automatic implementation to guided practice. The agent prepares the next exercise, the user writes the implementation, and the agent reviews the result before it continues the original task.
+SpotMe is gym mode for agentic coding: the agent scaffolds a unit, the human implements it, the agent reviews and resumes.
 
-This skill is agent-agnostic and prompt-only. It does not register commands, call custom tools, or intercept low-level file operations. Therefore, it counts logical implementation units rather than editor or tool calls.
+This is the **pure skill** (prompt-only). No plugin, no `spotme_*` tools, no write interception. You own the full state machine. Match the plugin’s user-facing behavior; store session data under the repo’s `.spotme/` directory.
 
-## Activation
+Upstream reference (behavior, wording, flow): `references/spotme/` — especially `SKILL.md`, `docs/flow.md`, `src/engine.ts`, `src/prompts.ts`.
 
-Activate SpotMe only after the user explicitly asks for it. When the user activates it:
+**Default off.** While inactive and no one-shot exercise is open, write code normally.
 
-1. Use the current difficulty and frequency when the user omits them. The initial values are `medium` and `2`.
-2. Recognize `lite`, `medium`, or `hard`, plus `every N` and `--every N`. Ignore unknown words. If the requested frequency is not a positive integer, keep the current value.
-3. Set the counter to zero.
-4. Clear any active exercise state. Do not delete or change an old exercise file.
-5. Confirm the settings in one short sentence.
+---
 
-Recognize these difficulty levels:
+## Session store
 
-- `lite`: provide imports, the complete signature, documentation, and basic structure. The user writes the body and core logic.
-- `medium`: provide the signature and a clear specification marker. The user writes the structure and all logic.
-- `hard`: provide only a plain-language specification marker. The user chooses the file layout, signature, and implementation.
+Repository root (the project being worked on):
 
-If the user asks to turn SpotMe off, disable it, clear the counter and active exercise state, and return to normal coding. Do not alter an exercise file unless the user asks for that change.
+```
+.spotme/
+  session.json
+```
 
-## Session state
+`session.json` is the **source of truth**. Load it before any SpotMe decision. Write it after every state change. Create `.spotme/` as needed.
 
-Keep this state in the current conversation. Do not create a hidden state file unless the user asks for persistent state.
+Default when missing or unreadable:
 
-- `enabled`: whether SpotMe is active.
-- `difficulty`: `lite`, `medium`, or `hard`.
-- `every`: the number of logical implementation units between exercises.
-- `counter`: the number of implementation units started since the last exercise ended.
-- `exercise`: the active unit, file path, difficulty, and specification.
-- `stats`: attempted, completed, solved, and skipped exercises for this session.
+```json
+{
+  "enabled": false,
+  "difficulty": "medium",
+  "every": 2,
+  "counter": 0,
+  "exercisePending": false,
+  "exercise": null,
+  "stats": { "attempted": 0, "completed": 0, "solved": 0, "skipped": 0 }
+}
+```
 
-If the user asks for status, report the enabled state, difficulty, frequency, counter, active exercise, and session statistics. If no exercise is active, say so.
+| Field | Role |
+|-------|------|
+| `enabled` | Recurring gym mode |
+| `difficulty` | `lite` \| `medium` \| `hard` |
+| `every` | Units between exercises (≥ 1) |
+| `counter` | Units since last exercise closed |
+| `exercisePending` | Scaffold in progress (do not re-trigger) |
+| `exercise` | `null` or active exercise object |
+| `stats` | Session tallies |
 
-Session state is temporary. If a new conversation does not contain SpotMe settings, treat SpotMe as off.
-An on-demand exercise may be active while recurring mode is off. Use the current difficulty, defaulting to `medium`, and do not start the recurring counter for that one-time exercise.
+Active `exercise` shape:
 
-## Counting logical implementation units
+```json
+{
+  "active": true,
+  "unit": "UserAuth.login",
+  "filePath": "src/auth/login.ts",
+  "difficulty": "medium",
+  "spec": "Validate credentials and return a typed session."
+}
+```
 
-A logical implementation unit is one coherent piece of source work, such as a function, method, class, handler, endpoint, migration, or small module. Count a unit once, even if it needs several file edits. Include application code, executable templates, and query code; use project context rather than a fixed extension list.
+Do not store SpotMe state outside `.spotme/`. Do not invent package tools.
 
-Do not count these by default:
+---
 
-- file reads, searches, or inspection;
-- documentation-only edits;
-- formatting-only edits;
-- dependency installation;
-- configuration-only edits;
-- test execution.
+## Commands / intents
 
-Count a test as an implementation unit only when writing the test is the main coding task.
+Hosts may use slash names (`/spotme:on`, …) or natural language. Treat as equivalent.
 
-Before implementing a new logical unit while SpotMe is active:
+| Intent | Action |
+|--------|--------|
+| **on** `[lite\|medium\|hard]` `[every N\|--every N]` | Enable recurring mode |
+| **off** | Disable; clear counter + exercise; normal coding |
+| **status** | Report live state from `session.json` |
+| **rep** / exercise now | On-demand exercise (no counter bump first) |
+| **done** / submit | Review → resume remaining work → end exercise last |
+| **hint** | One short approach paragraph; keep exercise |
+| **solve** | Implement → resume remaining work → end exercise last |
+| **skip** | Finish unit (no review lecture) → resume → end last |
 
-1. If an exercise is active, do not implement the unit. Wait for the user's exercise action.
-2. Increase `counter` by one.
-3. If `counter` is below `every`, implement the unit normally.
-4. If `counter` reaches `every`, reset `counter` to zero and turn that unit into the next exercise instead of implementing it.
+If done/hint/solve/skip with no active exercise: say so. Do not invent details.
 
-The frequency is a behavioral target, not a low-level hook. Never claim that SpotMe blocked a file operation. Say that SpotMe paused the next logical unit.
-Scaffold creation, user edits made outside the agent, review work, solution work, and resumed work must not create another exercise for the same active unit.
+### on
 
-## Starting an exercise
+1. Load `session.json` (or defaults).
+2. Parse args: `lite`/`medium`/`hard`; `every N` or `--every N`. Ignore unknown tokens. Keep current values when omitted. Defaults: medium, every 2. Reject non-positive `every` (keep previous).
+3. Set `enabled=true`, `counter=0`, `exercise=null`, `exercisePending=false`. Do not rewrite an old exercise source file.
+4. Write `session.json`.
+5. Confirm in one sentence (difficulty + every).
 
-When the counter reaches the frequency, or when the user asks for an exercise directly:
+### off
 
-1. Select the next logical unit from the original task.
-2. Preserve the original task and all relevant requirements in the conversation.
-3. Prepare only the scaffold required by the selected difficulty.
-4. Use the host's available file-reading and file-editing capabilities. Do not name or assume a particular tool.
-5. Add a clear `SPOTME:` marker using the comment syntax of the target file. The marker must state the implementation goal in one sentence. Add short requirement bullets when they prevent ambiguity.
-6. Do not write the implementation.
-7. Verify that the scaffold file exists and can be read. If verification fails, do not set active exercise state; report the problem.
-8. Set active exercise state with the chosen difficulty and reset `counter` to zero. For a one-time exercise while recurring mode is off, leave `enabled` off. Do not silently use a different difficulty.
-9. Tell the user the unit, file path, difficulty, and what they must implement. Tell them they can submit the work, ask for a hint, ask the agent to solve it, or skip it.
-10. Stop. Do not continue the original implementation until the user responds.
+1. Load; set `enabled=false`, `counter=0`, `exercise=null`, `exercisePending=false`.
+2. Write `session.json`.
+3. Confirm SpotMe is off and normal coding resumes. Do not alter the exercise source file.
 
-For an existing file, edit only the target area and preserve unrelated work. For a new file, create only the scaffold needed for the exercise.
+### status
 
-Use language-appropriate markers. Examples:
+Load and report (match plugin shape; units replace plugin “code writes”):
+
+```
+SpotMe: 🟢 on | ⚪ off
+Difficulty: …
+Trigger every: N unit(s)
+Counter: counter/every
+Active exercise: unit (filePath)   # only if exercise.active
+Stats: attempted=… completed=… solved=… skipped=…
+```
+
+### rep
+
+If an exercise is already active, say so and do not start another.  
+Otherwise start the next logical unit as an exercise immediately. Do **not** increment `counter` first. If `enabled` is false, one-shot: leave `enabled` false. Follow [Start an exercise](#start-an-exercise).
+
+---
+
+## Difficulty (scaffold rules)
+
+| Level | You provide | Human provides |
+|-------|-------------|----------------|
+| `lite` | Imports, full signature, docs, basic structure / stubs | Body / core logic |
+| `medium` | Signature + clear `SPOTME:` spec | Structure and all logic |
+| `hard` | Plain-language `SPOTME:` only | Layout, signature, implementation |
+
+Always use the file’s comment syntax (`#`, `//`, `--`, `<!-- -->`, …).
+
+The `SPOTME:` marker states the goal in **one sentence**. Add short requirement bullets only when needed to avoid ambiguity.
 
 ```python
-# SPOTME: Implement a bounded retry policy with exponential backoff.
+def calculate_discount(price: float, tier: str) -> float:
+    # SPOTME: return the discounted price given tier (bronze=5%, silver=10%, gold=20%)
+    pass
 ```
 
 ```typescript
-// SPOTME: Implement validation for the request body and return a typed error for each invalid field.
+// SPOTME: Implement a rate limiter middleware that allows N requests per window.
+// Key requirements:
+// - Sliding window algorithm
+// - Per-IP tracking
+// - Returns 429 with Retry-After header when exceeded
 ```
 
 ```html
 <!-- SPOTME: Implement the accessible empty state for this component. -->
 ```
 
-## Exercise actions
+---
 
-Interpret natural-language requests as follows. A host may map these intents to its own commands, but the skill must not require command names.
-If a user asks to submit, request a hint, solve, or skip without an active exercise, say that no exercise is active and do not invent exercise details. A direct request for a new exercise is the exception.
+## Counting units (plugin counter parity)
 
-### Submit for review
+The plugin counts code-writing tool calls on code files. The pure skill has no intercept hook, so count **logical implementation units** with the same cadence intent.
 
-When the user says that the exercise is done, submitted, or ready:
+A **unit** is one coherent source piece (function, method, class, handler, endpoint, migration, small module). Count once across several edits.
 
-1. Read the exercise file.
-2. Review the user's implementation without replacing it.
-3. Give feedback with these sections:
-   - **What is correct:** one or two specific points.
-   - **What needs work:** concrete missing behavior, defects, or risks.
-   - **Next steps:** include this only when the implementation is incomplete.
-4. Run focused existing tests when they are available and safe. Report the actual result. Do not invent a test command.
-5. Update the exercise statistics.
-6. Clear the active exercise and reset `counter` to zero.
-7. Resume the original task and complete any remaining work.
+**Count:** application code, executable templates, queries.  
+**Do not count:** reads/search, docs-only, format-only, dependency install, config-only, test *runs*. Count tests only when writing tests is the main task.  
+**Skip automatically:** trivial one-liner assignments and pure boilerplate imports — do not trigger exercises for those.
 
-Do not show the solution that the agent would have written. Review the user's code instead.
+While `enabled` and no active exercise and not `exercisePending`, before implementing a new unit:
 
-### Ask for a hint
+1. Load `session.json`.
+2. If `exercise?.active`, do not implement; wait for user action.
+3. `counter += 1`; write.
+4. If `counter < every` → implement normally.
+5. If `counter >= every` → `counter = 0`, `exercisePending = true`, write; **do not implement** — start an exercise instead.
 
-Give one targeted hint in one short paragraph. Point toward the approach without writing the implementation or revealing the complete solution. Keep the exercise active.
+Frequency is a behavioral target, not a file hook. Never claim a write was blocked. Say SpotMe paused the next logical unit.
 
-### Ask the agent to solve
+Scaffold writes, user editor work, review, solve, skip, and resume must **not** re-trigger the same active unit. Do not split a unit into smaller edits to dodge an exercise.
 
-When the user clearly asks the agent to implement the active exercise:
+---
 
-1. Read the exercise file.
-2. Replace the marker with a correct implementation, or improve the user's implementation.
-3. Briefly state the key pattern or lesson.
-4. Update the exercise statistics.
-5. Clear the active exercise and reset `counter` to zero.
-6. Resume the original task and complete any remaining work.
+## Start an exercise
 
-### Skip the exercise
+When the counter fires, or on **rep**:
 
-When the user asks to skip:
+1. Load state. Use session `difficulty` (default medium). Do not silently change difficulty.
+2. Pick the next real unit from the original task; keep full task context.
+3. Set `exercisePending=true` if not already; write (allows scaffold without re-trigger).
+4. Scaffold only to the selected difficulty. Edit only the target area in existing files; for new files, only the scaffold.
+5. Add a language-appropriate `SPOTME:` marker. Do **not** write the implementation.
+6. Verify the scaffold is readable on disk. On failure: leave `exercise` null, clear `exercisePending`, write, report the problem.
+7. Record exercise (replaces plugin `spotme_exercise`):
+   - Prefer **repo-relative** `filePath`
+   - `exercise = { active: true, unit, filePath, difficulty, spec }`
+   - `counter = 0`
+   - `exercisePending = false`
+   - `stats.attempted += 1`
+   - Difficulty must be the session difficulty (do not invent another)
+   - One-shot while off: leave `enabled` false
+   - Write `session.json`
+8. Show the exercise-ready message **in this shape** (plugin parity; slash or natural language both work):
 
-1. Do not review or solve the exercise unless the user also asks for that.
-2. Update the skipped count.
-3. Clear the active exercise and reset `counter` to zero.
-4. Resume the original task and complete the code normally.
+```
+🏋️ Exercise ready: **{unit}**
+Difficulty: {difficulty} — {label}
+File: `{filePath}`
 
-### Request an exercise directly
+Edit the file in your editor. Replace the `SPOTME:` marker with your implementation.
 
-When the user asks for a repetition, practice unit, or exercise outside the counter cycle, start the next logical exercise immediately. Do not increment the counter first. If recurring mode is off, make this a one-time exercise and leave recurring mode off. Follow the normal exercise-start procedure.
+Your options:
+  /spotme:hint   (or hint)   — get a targeted hint
+  /spotme:solve  (or solve)  — concede and let the agent finish
+  /spotme:skip   (or skip)   — skip this exercise
+  /spotme:done   (or done)   — submit your implementation for review
+```
 
-## Normal coding rules while active
+Difficulty labels (exact plugin wording):
 
-- Do not implement an exercise after the scaffold is ready unless the user asks to solve it or asks to resume normal coding.
-- Do not bypass an active exercise by splitting the same unit into smaller edits.
-- Do not count a partial edit as a completed unit.
-- If the user directly asks for normal implementation of the active unit, treat that as a solve request.
+- `lite` — signature + structure provided — implement the body  
+- `medium` — signature provided — implement the logic  
+- `hard` — spec only — design and implement from scratch  
+
+9. **Stop.** Do not implement further, do not hint, do not continue the task until the user acts.
+
+---
+
+## After handoff
+
+### done / submit
+
+1. Load state; require `exercise.active` (else say no active exercise).
+2. Read `exercise.filePath`.
+3. Feedback only — **do not** paste your full solution:
+   - **What is correct** — 1–2 specific points  
+   - **What needs work** — concrete gaps/defects (no vague “consider edge cases”)  
+   - **Next steps** — only if incomplete  
+4. Run focused existing tests when available and safe; report real results. Do not invent a test command.
+5. Resume the original task and finish remaining work **while the exercise is still active** (active exercise bypasses the unit counter — same as plugin).
+6. Then end: `stats.completed += 1` and [End exercise](#end-exercise-replaces-spotme_end) as the **last** state write.
+
+### hint
+
+One short paragraph toward the approach. No implementation. Keep `exercise` active. Do not end.
+
+### solve
+
+1. Load state; require active exercise (else say so).
+2. Read file; replace `SPOTME:` or improve the draft.
+3. Note one key pattern the user should remember.
+4. Resume remaining original-task work while exercise still active (counter bypass).
+5. Then end: `stats.solved += 1` and [End exercise](#end-exercise-replaces-spotme_end) as the **last** state write.
+
+### skip
+
+1. Load state; require active exercise (else say so).
+2. No review lecture unless asked.
+3. Complete the unit / resume the original task normally while exercise still active (counter bypass).
+4. Then end: `stats.skipped += 1` and [End exercise](#end-exercise-replaces-spotme_end) as the **last** state write.
+
+### End exercise (replaces `spotme_end`)
+
+Call only as the **last** SpotMe state write after done / solve / skip (plugin: `spotme_end` last):
+
+```
+exercise = null
+counter = 0
+exercisePending = false
+```
+
+Write `session.json`. Optional one-liner: `✅ Exercise closed. Counter reset. Resuming normal mode.`
+
+---
+
+## Hard rules
+
+- Off by default; no exercises while inactive except one-shot **rep**.
+- Never implement a scaffolded unit unless the user solves, skips, or clearly asks you to finish that unit (treat as solve).
+- While `exercise.active` or `exercisePending`, do not increment the counter and do not start a second exercise.
+- After done/solve/skip: finish resume work first, **end exercise last** (so remaining writes are not counted mid-resume).
+- Load before decide; write after every mutation.
 - Keep feedback specific and brief.
-- Preserve the original task context across the exercise.
+- Preserve original task context across the exercise.
+- Prefer real units over busywork.
 
-When recurring mode is off and no one-time exercise is active, follow the host's normal coding behavior and do not insert exercises.
+## Plugin mapping (no tools)
+
+| Plugin | Pure skill |
+|--------|------------|
+| `spotme_on` / `/spotme:on` | Write `session.json` enabled + settings |
+| `/spotme:off` | Disable + clear exercise/counter; write |
+| `spotme_status` / `/spotme:status` | Read and print `session.json` |
+| Write intercept + counter | Logical-unit counter + pause |
+| `exercisePending` (engine private) | `session.json.exercisePending` |
+| `spotme_exercise` | Set `exercise`, clear pending, write, print ready message |
+| `spotme_end` | Clear exercise/counter/pending; write last |
+| `/spotme:done\|hint\|solve\|skip\|rep` | Same intents (slash or NL) |

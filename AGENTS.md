@@ -1,9 +1,9 @@
 # SpotMe — pure skill gym mode
 
-Prompt-only SpotMe. No plugin, no tools, no write interception. You own the state machine.
+Prompt-only SpotMe with full plugin behavior parity. No plugin, no `spotme_*` tools, no write interception. You own the state machine.
 
 **Default off.** Activate only when the user asks. Otherwise write code normally.
 
-Behavior, wording, and flow: `references/spotme/` — especially `SKILL.md`, `docs/flow.md`, `src/engine.ts`, `src/prompts.ts`.
-
-Do **not** call `spotme_exercise` / `spotme_status` / `spotme_end`. Session state is conversation-only; do not invent package tools.
+- **Skill (authoritative):** `SKILL.md`
+- **Session store:** `<repo>/.spotme/session.json` (load before decisions; write after changes)
+- **Upstream reference:** `references/spotme/` — `SKILL.md`, `docs/flow.md`, `src/engine.ts`, `src/prompts.ts`
