@@ -53,12 +53,12 @@ spotme rep      # force an exercise now
 
 | Level | Agent gives | You do |
 |-------|-------------|--------|
-| `warmup` | Small self-contained reference (`SPOTME-WARMUP`) | Retype into the hole; delete the reference. Next successful `done` expands the snippet. |
-| `lite` | Signature + structure | Fill the body |
-| `medium` | Signature + `SPOTME:` spec | Structure + logic |
-| `hard` | Spec only | Design + implement |
+| `warmup` | Small self-contained reference on the **real unit path** | Short retype (form practice); expands a few rounds, then move to `lite`+ |
+| `lite` | Signature + docstring + structure / stubs | Just the body |
+| `medium` | Signature + `# SPOTME:` spec | All logic including structure |
+| `hard` | Plain-English `SPOTME:` only | Everything — layout, signature, logic |
 
-Default: `medium`, every 2 units.
+Default: `medium`, every 2 units. `lite` / `medium` / `hard` match the SpotMe plugin ladder; `warmup` is pure-skill form practice only (temporary, not a parallel lesson track).
 
 ## Example scaffold
 
@@ -72,7 +72,8 @@ export function allowRequest(ip: string, limit: number, hits: Map<string, number
 ## Tips
 
 - Off by default — only activates when you ask.
-- Prefer real units from your task over toy drills.
+- Exercises hit the next unit of **your task**, on real project paths (no inventing `01_`/`001_` drill files).
+- Warmup = short retype before freer work; prefer `lite`+ once the pattern sticks.
 - Gitignore `.spotme/` in consumer projects (created as needed).
 - Full state machine: `skills/spotme/SKILL.md`
 
