@@ -20,33 +20,52 @@ npx skills use caelaxie/spotme@spotme   # one-shot, no install
 
 ## Quick start
 
-1. Install the skill, then work on a real task as usual.
-2. Turn gym mode on:
+1. Install the skill.
+2. Give the agent a **real task** and turn SpotMe on in the same prompt (or right after).
+3. Every N logical units (default **every 2**, difficulty **medium**), the agent leaves a `SPOTME:` hole instead of finishing that unit.
+4. Edit the marked file in your editor.
+5. Tell the agent `done` / `hint` / `solve` / `skip`.
+6. Agent reviews (on `done`), continues the task, then the next exercise when the counter fires.
+7. `spotme off` when you want normal full-agent coding again.
+
+### Sample prompt
 
 ```text
-spotme on
-spotme on hard --every 3
-spotme on warmup
+SpotMe on medium --every 2.
+
+Add rate limiting to the public API:
+- middleware on /api/*
+- sliding window, N requests per IP per window
+- return 429 with Retry-After when exceeded
+- put it under src/middleware/ and wire it in the app router
+- add or update focused tests if the project already has them
+
+When SpotMe hands me a unit, pause and wait for me to implement it.
 ```
 
-3. Every N logical units (default **every 2**, difficulty **medium**), the agent leaves a `SPOTME:` hole instead of finishing the code.
-4. Edit the file in your editor.
-5. Tell the agent:
+Shorter variants:
+
+```text
+spotme on hard --every 3
+Implement OAuth login for GitHub in src/auth/, session cookie, and a /me endpoint.
+```
+
+```text
+spotme on warmup
+I'm rusty — warm me up on the next real units while we build this feature.
+Start tiny (typeable slices on the real files), expand each round, then level me up to lite when I'm ready.
+```
+
+### During an exercise
 
 ```text
 done     # submit for review
 hint     # one approach tip
 solve    # agent finishes this unit
 skip     # skip, no lecture
-```
-
-6. Agent reviews (on `done`), finishes remaining work, then continues.
-7. Turn off when done:
-
-```text
-spotme off
-spotme status   # anytime
+spotme status
 spotme rep      # force an exercise now
+spotme off
 ```
 
 ## Difficulty
