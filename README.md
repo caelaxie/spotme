@@ -95,7 +95,7 @@ export function allowRequest(ip: string, limit: number, hits: Map<string, number
 - Off by default — only activates when you ask.
 - Exercises hit the next unit of **your task**, on real project paths (no inventing `01_`/`001_` drill files).
 - Warmup = short retype before freer work; prefer `lite`+ once the pattern sticks.
-- Gitignore `.spotme/` in consumer projects (created as needed).
+- Session state lives at `.spotme/` (created as needed; not gitignored by default).
 - Full state machine: `skills/spotme/SKILL.md`
 
 ## License

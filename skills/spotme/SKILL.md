@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Agent Skills hosts that provide file reading and editing. No host-specific commands, tools, or extensions required.
 metadata:
   author: caelaxie
-  version: "0.0.2"
+  version: "0.0.3"
   mode: manual
 ---
 
